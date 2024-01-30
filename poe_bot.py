@@ -12,38 +12,38 @@ from typing import AsyncIterable
 import fastapi_poe as fp
 import modal
 from modal import Image, Stub, asgi_app
-from weavel import create_poe_client
+from weavel import create_poe_client # ADD THIS LINE
 load_dotenv()
 
-weavel = create_poe_client() # TODO
+weavel = create_poe_client() # ADD THIS LINE
 
 class GPT35TurboAllCapsBot(fp.PoeBot):
     async def get_response(
         self, request: fp.QueryRequest
     ) -> AsyncIterable[fp.PartialResponse]:
-        responses = [] # TODO
+        responses = [] # ADD THIS LINE
         async for msg in fp.stream_request(
             request, "GPT-3.5-Turbo", request.access_key
         ):
-            yield msg.model_copy(update={"text": msg.text.upper()})
-            responses.append(msg) # TODO
-        weavel.log(request, responses) # TODO
+            yield msg.model_copy(update={"text": msg.text})
+            responses.append(msg) # ADD THIS LINE
+        weavel.log(request, responses) # ADD THIS LINE
             
 
     async def get_settings(self, setting: fp.SettingsRequest) -> fp.SettingsResponse:
         return fp.SettingsResponse(allow_attachments=True, server_bot_dependencies={"GPT-3.5-Turbo": 1})
 
 
-REQUIREMENTS = ["fastapi-poe==0.0.24", "python-dotenv", "weavel"]
+REQUIREMENTS = ["fastapi-poe==0.0.24", "python-dotenv", "weavel>=0.0.7"] # ADD "weavel>=0.0.7"
 image = Image.debian_slim().pip_install(*REQUIREMENTS)
 stub = Stub("turbo-allcaps-poe")
 
 
 @stub.function(
     image=image, 
-    secret=[
+    secrets=[
         modal.Secret.from_name("POE_ACCESS_KEY"),
-        modal.Secret.from_name("WEAVEL_API_KEY"),
+        modal.Secret.from_name("WEAVEL_API_KEY"), # ADD WEAVEL_API_KEY in modal.com secrets or .env file
     ]
 )
 @asgi_app()
