@@ -1,0 +1,3 @@
+weavel
+fastapi-poe
+python-dotenv
