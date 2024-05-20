@@ -6,35 +6,52 @@ Sample bot that wraps GPT-3.5-Turbo but makes responses use all-caps.
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from dotenv import load_dotenv
-from typing import AsyncIterable
+from typing import AsyncIterable, List
 
 import fastapi_poe as fp
+from fastapi_poe.types import PartialResponse
 import modal
 from modal import Image, Stub, asgi_app
-from weavel import create_poe_client # ADD THIS LINE
+from weavel import create_client, WeavelClient # ADD THIS LINE
 load_dotenv()
 
-weavel = create_poe_client() # ADD THIS LINE
+weavel: WeavelClient = create_client() # ADD THIS LINE
 
 class GPT35TurboAllCapsBot(fp.PoeBot):
     async def get_response(
         self, request: fp.QueryRequest
     ) -> AsyncIterable[fp.PartialResponse]:
-        responses = [] # ADD THIS LINE
+        responses: List[PartialResponse] = [] # ADD THIS LINE to save stream responses
+                
+        trace = weavel.open_trace(
+            user_id=request.user_id, 
+            trace_id=request.conversation_id
+        ) # ADD THIS LINE to create conversation(trace) instance
+        
+        trace.log_message(
+            "user", 
+            request.query[-1].content, 
+            timestamp=datetime.fromtimestamp(request.query[-1].timestamp / 1000000, timezone.utc)
+        ) # ADD THIS LINE to log user message
+        
         async for msg in fp.stream_request(
             request, "GPT-3.5-Turbo", request.access_key
         ):
             yield msg.model_copy(update={"text": msg.text})
-            responses.append(msg) # ADD THIS LINE
-        weavel.log(request, responses) # ADD THIS LINE
+            responses.append(msg) # ADD THIS LINE to save stream responses
             
+        trace.log_message(
+            "assistant",
+            "".join([response.text for response in responses]),
+            timestamp=datetime.now(timezone.utc),
+        ) # ADD THIS LINE to log bot message
 
     async def get_settings(self, setting: fp.SettingsRequest) -> fp.SettingsResponse:
         return fp.SettingsResponse(allow_attachments=True, server_bot_dependencies={"GPT-3.5-Turbo": 1})
 
-
-REQUIREMENTS = ["fastapi-poe==0.0.24", "python-dotenv", "weavel>=0.0.7"] # ADD "weavel>=0.0.7"
+REQUIREMENTS = ["fastapi-poe", "python-dotenv", "weavel>=0.4.0"] # ADD "weavel>=0.4.0"
 image = Image.debian_slim().pip_install(*REQUIREMENTS)
 stub = Stub("turbo-allcaps-poe")
 
